@@ -84,39 +84,45 @@ app.post("/login", async (request, response) => {
   }
 });
 
-// change password of a user api 
-app.put("/change-password",(request,response)=>{
-    const{ username, oldPassword, newPassword } = request.body;
-    const getUserName = `
+// change password of a user api
+app.put("/change-password", async (request, response) => {
+  const { username, oldPassword, newPassword } = request.body;
+  const getUserName = `
     SELECT * FROM
     user 
     WHERE
     username = '${username}';`;
 
-    const userNameDetails = await db.get(getUserName);
-    const checkPassword = await bcrypt.compare(oldPassword,userNameDetails.password);
-    if(newPassword.length<5){
+  const userNameDetails = await db.get(getUserName);
+
+  if (userNameDetails === undefined) {
+    response.status(400);
+    response.send("User Not Registered");
+  } else {
+    const checkPassword = await bcrypt.compare(
+      oldPassword,
+      userNameDetails.password
+    );
+    if (checkPassword === true) {
+      if (newPassword.length < 5) {
         response.status(400);
         response.send("Password is too short");
+      } else {
+        const hashed = await bcrypt.hash(newPassword, 10);
+        const updatePassword = `
+        UPDATE  user
+        SET 
+        password = '${hashed}'
+        WHERE
+        username = '${username}';`;
+        await db.run(updatePassword);
+        response.send("Password updated");
+      }
+    } else {
+      response.status(400);
+      response.send("Invalid current password");
     }
-
-    const hashed = await bcrypt.hash(newPassword,10);
-    
-    if(checkPassword===true){
-    const updatePassword = `
-    UPDATE  user
-    SET 
-    password = '${hashed}'
-    WHERE
-    username = '${username}';`; 
-    await db.run(updatePassword);
-    response.status(400);
-    response.send("Password updated");
-    }
-    else{
-        response.status(400);
-        response.send("Invalid current password");
-    }
+  }
 });
 
 module.exports = app;
